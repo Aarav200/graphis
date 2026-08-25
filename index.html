@@ -11,93 +11,98 @@
 </head>
 <body>
 
+<a class="skip-link" href="#app">Skip to main content</a>
+
 <header class="topbar">
   <div class="brand">
-    <div class="brand-mark">◈</div>
+    <div class="brand-mark" aria-hidden="true">◈</div>
     <div>
       <h1>Graphis</h1>
       <p>Academic citation &amp; knowledge graph engine</p>
     </div>
   </div>
-  <div id="loginBar" class="login-bar"></div>
+  <div id="loginBar" class="login-bar" role="status" aria-live="polite"></div>
 </header>
 
 <div id="loginGate" class="login-gate">
   <div class="login-card">
-    <h2>Sign in</h2>
-    <p>Local demo accounts — enter any name to continue. Two different names simulate two researchers so you can test collaboration matching.</p>
-    <input id="loginName" type="text" placeholder="Your name (e.g. Aditi Rao)" />
-    <button id="loginBtn">Continue</button>
+    <h2 id="loginHeading">Sign in</h2>
+    <p id="loginDesc">Local demo accounts — enter any name to continue. Two different names simulate two researchers so you can test collaboration matching.</p>
+    <label class="visually-hidden" for="loginName">Your name</label>
+    <input id="loginName" type="text" placeholder="Your name (e.g. Aditi Rao)" aria-describedby="loginDesc" autocomplete="name" />
+    <button id="loginBtn" type="button">Continue</button>
   </div>
 </div>
 
 <main id="app" class="app hidden">
 
-  <nav class="tabs">
-    <button class="tab-btn active" data-tab="graph">Knowledge Graph</button>
-    <button class="tab-btn" data-tab="fields">Field Relevance</button>
-    <button class="tab-btn" data-tab="collab">Collaboration</button>
-    <button class="tab-btn" data-tab="chat">Research Assistant</button>
+  <nav class="tabs" role="tablist" aria-label="Graphis sections">
+    <button class="tab-btn active" role="tab" id="tabbtn-graph" data-tab="graph" aria-selected="true" aria-controls="tab-graph" tabindex="0">Knowledge Graph</button>
+    <button class="tab-btn" role="tab" id="tabbtn-fields" data-tab="fields" aria-selected="false" aria-controls="tab-fields" tabindex="-1">Field Relevance</button>
+    <button class="tab-btn" role="tab" id="tabbtn-collab" data-tab="collab" aria-selected="false" aria-controls="tab-collab" tabindex="-1">Collaboration</button>
+    <button class="tab-btn" role="tab" id="tabbtn-chat" data-tab="chat" aria-selected="false" aria-controls="tab-chat" tabindex="-1">Research Assistant</button>
   </nav>
 
-  <section id="tab-graph" class="tab-panel active">
+  <section id="tab-graph" class="tab-panel active" role="tabpanel" aria-labelledby="tabbtn-graph">
     <aside class="sidebar">
       <h3>Ingest sources</h3>
       <p class="hint">Drop PDFs, Markdown, or code files. Graphis extracts entities and surfaces hidden connections.</p>
-      <div id="dropZone" class="drop-zone">
-        <div class="drop-icon">⭱</div>
+      <div id="dropZone" class="drop-zone" role="button" tabindex="0" aria-label="Drag and drop files here, or activate to browse for files. Accepted types: PDF, Markdown, Python, JavaScript, TypeScript.">
+        <div class="drop-icon" aria-hidden="true">⭱</div>
         <p><strong>Drag files here</strong>, or <label for="fileInput" class="browse-link">browse</label></p>
         <span class="filetypes">.pdf · .md · .py · .js · .ts</span>
         <input id="fileInput" type="file" multiple accept=".pdf,.md,.py,.js,.ts,.jsx,.tsx" hidden />
       </div>
-      <div id="fileList" class="file-list"></div>
-      <button id="buildBtn" class="primary-btn">Build knowledge graph</button>
-      <div id="statusMsg" class="status-msg"></div>
+      <div id="fileList" class="file-list" aria-live="polite"></div>
+      <button id="buildBtn" class="primary-btn" type="button">Build knowledge graph</button>
+      <div id="statusMsg" class="status-msg" role="status" aria-live="polite"></div>
     </aside>
     <div class="graph-area">
-      <div id="graphCanvas" class="graph-canvas"></div>
+      <div id="graphCanvas" class="graph-canvas" role="img" aria-label="Interactive 3D knowledge graph. Click any node for its details and connections in the panel that opens; the same information is available there without needing to interact with the 3D view."></div>
       <div id="graphEmpty" class="graph-empty">
-        <div class="empty-icon">◈</div>
+        <div class="empty-icon" aria-hidden="true">◈</div>
         <h3>Your knowledge graph will appear here</h3>
         <p>Upload papers, notes, or code to start extracting entities and relationships.</p>
       </div>
-      <div id="nodePanel" class="node-panel hidden">
-        <button id="closeNodePanel" class="close-btn">✕</button>
+      <div id="nodePanel" class="node-panel hidden" role="dialog" aria-labelledby="nodePanelContent">
+        <button id="closeNodePanel" class="close-btn" type="button" aria-label="Close details panel">✕</button>
         <div id="nodePanelContent"></div>
       </div>
       <div class="legend">
-        <span><i class="dot dot-explicit"></i> Explicit relationship</span>
-        <span><i class="dot dot-hidden"></i> Hidden connection (AI-inferred)</span>
+        <span><i class="dot dot-explicit" aria-hidden="true"></i> Explicit relationship</span>
+        <span><i class="dot dot-hidden" aria-hidden="true"></i> Hidden connection (AI-inferred)</span>
       </div>
     </div>
   </section>
 
-  <section id="tab-fields" class="tab-panel">
+  <section id="tab-fields" class="tab-panel" role="tabpanel" aria-labelledby="tabbtn-fields">
     <h2>Field Relevance Scale</h2>
     <p class="hint">How your uploaded work relates across research fields, scored 0–100 by the extraction model.</p>
     <div id="fieldScores" class="field-scores"></div>
   </section>
 
-  <section id="tab-collab" class="tab-panel">
+  <section id="tab-collab" class="tab-panel" role="tabpanel" aria-labelledby="tabbtn-collab">
     <h2>Collaboration Matches</h2>
     <p class="hint">Documents from other local demo users compared against yours by semantic similarity. Nothing here leaves your browser except the direct extraction/embedding API calls.</p>
     <div id="collabList" class="collab-list"></div>
   </section>
 
-  <section id="tab-chat" class="tab-panel">
+  <section id="tab-chat" class="tab-panel" role="tabpanel" aria-labelledby="tabbtn-chat">
     <div class="chat-wrap">
-      <div id="chatMessages" class="chat-messages">
+      <div id="chatMessages" class="chat-messages" role="log" aria-live="polite" aria-label="Conversation with research assistant">
         <div class="chat-bubble assistant">Hi! I'm your research assistant. Ask me about your uploaded papers, what connects them, or who you might want to collaborate with.</div>
       </div>
       <div class="chat-input-row">
+        <label class="visually-hidden" for="chatInput">Ask about your research graph</label>
         <input id="chatInput" type="text" placeholder="Ask about your research graph..." />
-        <button id="chatSendBtn" class="primary-btn">Send</button>
+        <button id="chatSendBtn" class="primary-btn" type="button">Send</button>
       </div>
     </div>
   </section>
 
 </main>
 
+<script src="utils.js"></script>
 <script src="app.js"></script>
 </body>
 </html>

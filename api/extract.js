@@ -50,13 +50,16 @@ ${text}
       : await callGroqExtraction(schemaInstructions, GROQ_KEY);
   } catch (primaryErr) {
     // fallback to the other provider if the first fails
-    try {
-      extraction = GROQ_KEY && GEMINI_KEY
-        ? await callGroqExtraction(schemaInstructions, GROQ_KEY)
-        : null;
-      if (!extraction) throw primaryErr;
-    } catch (fallbackErr) {
-      return res.status(502).json({ error: "Extraction failed on all configured providers: " + fallbackErr.message });
+    if (GROQ_KEY && GEMINI_KEY) {
+      try {
+        extraction = await callGroqExtraction(schemaInstructions, GROQ_KEY);
+      } catch (fallbackErr) {
+        return res.status(502).json({
+          error: `Extraction failed on all configured providers. Gemini: ${primaryErr.message} | Groq: ${fallbackErr.message}`
+        });
+      }
+    } else {
+      return res.status(502).json({ error: "Extraction failed: " + primaryErr.message });
     }
   }
 
@@ -71,8 +74,14 @@ ${text}
   return res.status(200).json({ ...extraction, embedding });
 }
 
+// Model names as of Aug 2026. gemini-2.0-flash was shut down June 1, 2026 —
+// gemini-flash-latest is a Google-maintained alias that auto-updates to the
+// current Flash model, so this call shouldn't go stale the same way again.
+const GEMINI_MODEL = "gemini-flash-latest";
+const GEMINI_EMBEDDING_MODEL = "gemini-embedding-001"; // text-embedding-004 was shut down Jan 14, 2026
+
 async function callGeminiExtraction(prompt, key) {
-  const resp = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${key}`, {
+  const resp = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent?key=${key}`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({
@@ -80,7 +89,10 @@ async function callGeminiExtraction(prompt, key) {
       generationConfig: { responseMimeType: "application/json" }
     })
   });
-  if (!resp.ok) throw new Error(`Gemini extraction error ${resp.status}`);
+  if (!resp.ok) {
+    const body = await resp.text().catch(() => "");
+    throw new Error(`Gemini extraction error ${resp.status}: ${body.slice(0, 300)}`);
+  }
   const data = await resp.json();
   const raw = data?.candidates?.[0]?.content?.parts?.[0]?.text || "{}";
   return safeParseJson(raw);
@@ -96,19 +108,31 @@ async function callGroqExtraction(prompt, key) {
       response_format: { type: "json_object" }
     })
   });
-  if (!resp.ok) throw new Error(`Groq extraction error ${resp.status}`);
+  if (!resp.ok) {
+    const body = await resp.text().catch(() => "");
+    throw new Error(`Groq extraction error ${resp.status}: ${body.slice(0, 300)}`);
+  }
   const data = await resp.json();
   const raw = data?.choices?.[0]?.message?.content || "{}";
   return safeParseJson(raw);
 }
 
 async function callGeminiEmbedding(text, key) {
-  const resp = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/text-embedding-004:embedContent?key=${key}`, {
+  const resp = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_EMBEDDING_MODEL}:embedContent?key=${key}`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ content: { parts: [{ text: text.slice(0, 8000) }] } })
+    // outputDimensionality keeps vectors small (matches the pseudoEmbedding
+    // fallback's spirit) instead of the 3072-dim default, which is overkill
+    // for in-browser cosine similarity over a handful of documents.
+    body: JSON.stringify({
+      content: { parts: [{ text: text.slice(0, 8000) }] },
+      outputDimensionality: 256
+    })
   });
-  if (!resp.ok) throw new Error(`Gemini embedding error ${resp.status}`);
+  if (!resp.ok) {
+    const body = await resp.text().catch(() => "");
+    throw new Error(`Gemini embedding error ${resp.status}: ${body.slice(0, 300)}`);
+  }
   const data = await resp.json();
   return data?.embedding?.values || [];
 }

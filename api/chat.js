@@ -24,27 +24,39 @@ Answer the researcher's question below concisely and helpfully, referencing thei
 Question: ${message}
 `.trim();
 
+  let reply;
   try {
-    let reply;
-    try {
-      reply = GEMINI_KEY ? await callGemini(prompt, GEMINI_KEY) : await callGroq(prompt, GROQ_KEY);
-    } catch (err) {
-      if (GEMINI_KEY && GROQ_KEY) reply = await callGroq(prompt, GROQ_KEY);
-      else throw err;
+    reply = GEMINI_KEY ? await callGemini(prompt, GEMINI_KEY) : await callGroq(prompt, GROQ_KEY);
+  } catch (primaryErr) {
+    if (GEMINI_KEY && GROQ_KEY) {
+      try {
+        reply = await callGroq(prompt, GROQ_KEY);
+      } catch (fallbackErr) {
+        return res.status(502).json({
+          error: `Chat failed on all configured providers. Gemini: ${primaryErr.message} | Groq: ${fallbackErr.message}`
+        });
+      }
+    } else {
+      return res.status(502).json({ error: "Chat failed: " + primaryErr.message });
     }
-    return res.status(200).json({ reply });
-  } catch (err) {
-    return res.status(502).json({ error: "Chat failed: " + err.message });
   }
+  return res.status(200).json({ reply });
 }
 
+// gemini-2.0-flash was shut down June 1, 2026. gemini-flash-latest is a
+// Google-maintained alias that auto-updates to the current Flash model.
+const GEMINI_MODEL = "gemini-flash-latest";
+
 async function callGemini(prompt, key) {
-  const resp = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${key}`, {
+  const resp = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent?key=${key}`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ contents: [{ parts: [{ text: prompt }] }] })
   });
-  if (!resp.ok) throw new Error(`Gemini chat error ${resp.status}`);
+  if (!resp.ok) {
+    const body = await resp.text().catch(() => "");
+    throw new Error(`Gemini chat error ${resp.status}: ${body.slice(0, 300)}`);
+  }
   const data = await resp.json();
   return data?.candidates?.[0]?.content?.parts?.[0]?.text || "I couldn't generate a reply.";
 }
@@ -55,7 +67,10 @@ async function callGroq(prompt, key) {
     headers: { "Content-Type": "application/json", "Authorization": `Bearer ${key}` },
     body: JSON.stringify({ model: "llama-3.3-70b-versatile", messages: [{ role: "user", content: prompt }] })
   });
-  if (!resp.ok) throw new Error(`Groq chat error ${resp.status}`);
+  if (!resp.ok) {
+    const body = await resp.text().catch(() => "");
+    throw new Error(`Groq chat error ${resp.status}: ${body.slice(0, 300)}`);
+  }
   const data = await resp.json();
   return data?.choices?.[0]?.message?.content || "I couldn't generate a reply.";
 }

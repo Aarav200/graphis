@@ -62,14 +62,32 @@ function enterApp() {
 })();
 
 // ---------- Tabs ----------
-document.querySelectorAll(".tab-btn").forEach(btn => {
-  btn.addEventListener("click", () => {
-    document.querySelectorAll(".tab-btn").forEach(b => b.classList.remove("active"));
-    document.querySelectorAll(".tab-panel").forEach(p => p.classList.remove("active"));
-    btn.classList.add("active");
-    document.getElementById("tab-" + btn.dataset.tab).classList.add("active");
-    if (btn.dataset.tab === "fields") renderFieldScores();
-    if (btn.dataset.tab === "collab") renderCollabList();
+const tabBtns = Array.from(document.querySelectorAll(".tab-btn"));
+
+function activateTab(btn) {
+  tabBtns.forEach(b => {
+    b.classList.remove("active");
+    b.setAttribute("aria-selected", "false");
+    b.tabIndex = -1;
+  });
+  document.querySelectorAll(".tab-panel").forEach(p => p.classList.remove("active"));
+  btn.classList.add("active");
+  btn.setAttribute("aria-selected", "true");
+  btn.tabIndex = 0;
+  document.getElementById("tab-" + btn.dataset.tab).classList.add("active");
+  if (btn.dataset.tab === "fields") renderFieldScores();
+  if (btn.dataset.tab === "collab") renderCollabList();
+}
+
+tabBtns.forEach((btn, i) => {
+  btn.addEventListener("click", () => { activateTab(btn); btn.focus(); });
+  btn.addEventListener("keydown", e => {
+    let target = null;
+    if (e.key === "ArrowRight") target = tabBtns[(i + 1) % tabBtns.length];
+    else if (e.key === "ArrowLeft") target = tabBtns[(i - 1 + tabBtns.length) % tabBtns.length];
+    else if (e.key === "Home") target = tabBtns[0];
+    else if (e.key === "End") target = tabBtns[tabBtns.length - 1];
+    if (target) { e.preventDefault(); activateTab(target); target.focus(); }
   });
 });
 
@@ -77,6 +95,9 @@ document.querySelectorAll(".tab-btn").forEach(btn => {
 const dropZone = document.getElementById("dropZone");
 const fileInput = document.getElementById("fileInput");
 dropZone.addEventListener("click", () => fileInput.click());
+dropZone.addEventListener("keydown", e => {
+  if (e.key === "Enter" || e.key === " ") { e.preventDefault(); fileInput.click(); }
+});
 dropZone.addEventListener("dragover", e => { e.preventDefault(); dropZone.classList.add("drag-over"); });
 dropZone.addEventListener("dragleave", () => dropZone.classList.remove("drag-over"));
 dropZone.addEventListener("drop", e => {
@@ -87,16 +108,15 @@ dropZone.addEventListener("drop", e => {
 fileInput.addEventListener("change", e => handleFiles(e.target.files));
 
 function handleFiles(fileListObj) {
-  const allowed = [".pdf", ".md", ".py", ".js", ".ts", ".jsx", ".tsx"];
   Array.from(fileListObj).forEach(f => {
-    const ext = "." + f.name.split(".").pop().toLowerCase();
-    if (!allowed.includes(ext)) {
+    if (!isAllowedFileType(f.name)) {
       setStatus(`"${f.name}" is not a supported file type.`, "error");
       return;
     }
     stagedFiles.push(f);
   });
   renderFileList();
+  if (stagedFiles.length) setStatus(`${stagedFiles.length} file(s) ready to build.`, "success");
 }
 
 function renderFileList() {
@@ -137,19 +157,7 @@ async function extractTextFromFile(file) {
   }
 }
 
-function extractCodeSymbols(text, ext) {
-  const symbols = { functions: [], classes: [], imports: [] };
-  if (["py"].includes(ext)) {
-    symbols.functions = [...text.matchAll(/def\s+(\w+)/g)].map(m => m[1]);
-    symbols.classes = [...text.matchAll(/class\s+(\w+)/g)].map(m => m[1]);
-    symbols.imports = [...text.matchAll(/(?:import|from)\s+([\w.]+)/g)].map(m => m[1]);
-  } else if (["js", "ts", "jsx", "tsx"].includes(ext)) {
-    symbols.functions = [...text.matchAll(/function\s+(\w+)/g)].map(m => m[1]);
-    symbols.classes = [...text.matchAll(/class\s+(\w+)/g)].map(m => m[1]);
-    symbols.imports = [...text.matchAll(/import .*?from\s+['"](.+?)['"]/g)].map(m => m[1]);
-  }
-  return symbols;
-}
+// extractCodeSymbols now lives in utils.js (shared with the test suite)
 
 // ---------- Build knowledge graph ----------
 document.getElementById("buildBtn").addEventListener("click", buildKnowledgeGraph);
@@ -407,14 +415,5 @@ function updateLastAssistantBubble(text) {
 }
 
 // ---------- Utils ----------
-function cosineSimilarity(a, b) {
-  if (!a || !b || a.length === 0 || b.length === 0 || a.length !== b.length) return 0;
-  let dot = 0, magA = 0, magB = 0;
-  for (let i = 0; i < a.length; i++) { dot += a[i] * b[i]; magA += a[i] * a[i]; magB += b[i] * b[i]; }
-  if (magA === 0 || magB === 0) return 0;
-  return dot / (Math.sqrt(magA) * Math.sqrt(magB));
-}
-function cryptoRandomId() { return Math.random().toString(36).slice(2) + Date.now().toString(36); }
-function escapeHtml(str) {
-  return String(str).replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
-}
+// cosineSimilarity, cryptoRandomId, escapeHtml, isAllowedFileType now live in
+// utils.js (loaded before this file) so they can be unit-tested independently.
